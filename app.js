@@ -341,39 +341,14 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
     // Tab navigation
-    function loadHomeTab() {
-        currentTab = 'home';
-        currentHome = 'new';
-        // Set Home tab active in main tab bar
-        document.querySelectorAll('.tab-btn').forEach(tb => {
-            tb.classList.toggle('active', tb.getAttribute('data-tab') === 'home');
-        });
-        // Set Home subtab active (New)
-        document.querySelectorAll('.home-dropdown-btn').forEach(tb => {
-            tb.classList.toggle('active', tb.getAttribute('data-home') === 'new');
-        });
-        renderMoviesForTab('home');
-    }
     sideMenuBtns.forEach(btn => {
         btn.addEventListener('click', function(e) {
             document.querySelectorAll('.side-menu-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            // Home tab: load recent movies/shows (like New tab)
+            // Home tab: toggle sublist
             if (btn.getAttribute('data-tab') === 'home') {
                 e.preventDefault();
                 if (sideMenuHomeGroup) sideMenuHomeGroup.classList.toggle('open');
-                // Always close detail page if open
-                const detailPage = document.getElementById('detailPage');
-                const moviesGrid = document.getElementById('moviesGrid');
-                const loadingDiv = document.getElementById('loading');
-                const errorDiv = document.getElementById('error');
-                if (detailPage && detailPage.style.display !== 'none') {
-                    detailPage.style.display = 'none';
-                    if (moviesGrid) moviesGrid.style.display = '';
-                    if (loadingDiv) loadingDiv.style.display = '';
-                    if (errorDiv) errorDiv.style.display = '';
-                }
-                loadHomeTab();
                 return;
             } else {
                 if (sideMenuHomeGroup) sideMenuHomeGroup.classList.remove('open');
@@ -398,14 +373,6 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             sideMenu.classList.remove('open');
         });
-    });
-    // Main tab bar: Home tab click always loads 'new' view
-    document.querySelectorAll('.tab-btn').forEach(tb => {
-        if (tb.getAttribute('data-tab') === 'home') {
-            tb.addEventListener('click', function(e) {
-                loadHomeTab();
-            });
-        }
     });
     // Home sublist navigation
     sideMenuHomeSubBtns.forEach(btn => {
@@ -717,8 +684,6 @@ function createMovieCard(movie, tab) {
     const inWatchlist = watchlist.some(m => m.id === movie.id) || watchlist.some(m => (m.title || m.name || '').toLowerCase().trim() === normTitle);
     const inWatched = watched.some(m => m.id === movie.id) || watched.some(m => (m.title || m.name || '').toLowerCase().trim() === normTitle);
     if ((tab === 'home' && currentHome === 'new') || tab === 'home' || tab === undefined) {
-        const actionContainer = document.createElement('div');
-        actionContainer.className = 'card-action-container';
         const btn = document.createElement('button');
         btn.className = 'tab-action-btn';
         if (inWatchlist || inWatched) {
@@ -757,11 +722,8 @@ function createMovieCard(movie, tab) {
                 }
             };
         }
-        actionContainer.appendChild(btn);
-        card.appendChild(actionContainer);
+        card.appendChild(btn);
     } else if (tab === 'watchlist') {
-        const actionContainer = document.createElement('div');
-        actionContainer.className = 'card-action-container';
         const btn = document.createElement('button');
         btn.textContent = 'Mark as Watched';
         btn.className = 'tab-action-btn';
@@ -775,8 +737,7 @@ function createMovieCard(movie, tab) {
                 updateProfileStats();
             }
         };
-        actionContainer.appendChild(btn);
-        card.appendChild(actionContainer);
+        card.appendChild(btn);
     }
 
     card.addEventListener('click', () => {
