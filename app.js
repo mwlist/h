@@ -1,46 +1,125 @@
 // --- Side Menu Responsive Logic ---
 window.addEventListener('DOMContentLoaded', () => {
-            // Ensure profile stats are rendered on first load
-            setTimeout(updateProfileStats, 0);
-        // --- Profile Stats Update ---
-        function getProfileStatsHtml() {
-            // Count movies, shows, and total runtime from watched
-            let movieCount = 0, showCount = 0, totalRuntime = 0;
-            for (const item of watched) {
-                if (item.media_type === 'movie' || item.type === 'movie') {
-                    movieCount++;
-                    let runtime = item.runtime || item.duration || item.length || 0;
-                    if (!runtime && item.episode_run_time && Array.isArray(item.episode_run_time)) {
-                        runtime = item.episode_run_time[0] || 0;
-                    }
-                    totalRuntime += runtime;
-                } else if (item.media_type === 'tv' || item.type === 'tv' || item.type === 'show') {
-                    showCount++;
-                    // Try to estimate total runtime for TV shows
-                    let episodes = item.number_of_episodes || item.episodes || 0;
-                    let epRuntime = item.episode_run_time || (item.episode_run_time && item.episode_run_time[0]) || 0;
-                    if (Array.isArray(item.episode_run_time)) epRuntime = item.episode_run_time[0] || 0;
-                    if (!epRuntime && item.runtime) epRuntime = item.runtime;
-                    if (episodes && epRuntime) {
-                        totalRuntime += episodes * epRuntime;
+            // Helper to fetch missing runtime/episode info from TMDB for watched items
+            async function fetchMissingRuntimesForProfile(items) {
+                let updated = false;
+                for (let m of items) {
+                    // Only fetch if missing runtime info
+                    if (m.media_type === 'tv') {
+                        let needs = !m.episode_run_time && !m.runtime;
+                        if (needs && m.id && typeof m.id === 'number') {
+                            try {
+                                const resp = await fetch(`${TMDB_BASE_URL}/tv/${m.id}?api_key=${TMDB_API_KEY}&language=en-US`);
+                                if (resp.ok) {
+                                    const data = await resp.json();
+                                    if (Array.isArray(data.episode_run_time) && data.episode_run_time.length > 0) m.episode_run_time = data.episode_run_time;
+                                    if (typeof data.runtime === 'number') m.runtime = data.runtime;
+                                    if (typeof data.number_of_episodes === 'number') m.number_of_episodes = data.number_of_episodes;
+                                    if (Array.isArray(data.seasons)) m.seasons = data.seasons;
+                                    updated = true;
+                                }
+                            } catch {}
+                        }
+                    } else {
+                        let needs = typeof m.runtime !== 'number' && typeof m.duration !== 'number' && typeof m.length !== 'number';
+                        if (needs && m.id && typeof m.id === 'number') {
+                            try {
+                                const resp = await fetch(`${TMDB_BASE_URL}/movie/${m.id}?api_key=${TMDB_API_KEY}&language=en-US`);
+                                if (resp.ok) {
+                                    const data = await resp.json();
+                                    if (typeof data.runtime === 'number') m.runtime = data.runtime;
+                                    updated = true;
+                                }
+                            } catch {}
+                        }
                     }
                 }
+                return updated;
             }
-            // Format runtime as H M
-            const h = Math.floor(totalRuntime / 60);
-            const m = totalRuntime % 60;
-            const runtimeStr = `${h > 0 ? h + 'h ' : ''}${m}m`;
+        // --- Profile Stats Update ---
+        function getProfileStatsHtml() {
+            // Accurate stats calculation (copied from renderWatchedSummary)
+            let movies = watched;
+            let total = movies.length;
+            let totalMovies = movies.filter(m => m.media_type !== 'tv').length;
+            let totalShows = movies.filter(m => m.media_type === 'tv').length;
+            let totalMinutes = 0;
+            movies.forEach(m => {
+                if (m.media_type === 'tv') {
+                    // Gather all episode runtimes from top-level and all seasons
+                    let epTimes = [];
+                    if (Array.isArray(m.episode_run_time) && m.episode_run_time.length > 0) {
+                        epTimes = epTimes.concat(m.episode_run_time.filter(x => typeof x === 'number' && x > 0));
+                    } else if (typeof m.episode_run_time === 'number' && m.episode_run_time > 0) {
+                        epTimes.push(m.episode_run_time);
+                    }
+                    if (Array.isArray(m.seasons)) {
+                        m.seasons.forEach(season => {
+                            if (Array.isArray(season.episode_run_time) && season.episode_run_time.length > 0) {
+                                epTimes = epTimes.concat(season.episode_run_time.filter(x => typeof x === 'number' && x > 0));
+                            } else if (typeof season.episode_run_time === 'number' && season.episode_run_time > 0) {
+                                epTimes.push(season.episode_run_time);
+                            }
+                        });
+                    }
+                    // Use average episode runtime if available, else fallback to 45 min per episode
+                    let epTime = 0;
+                    if (epTimes.length > 0) {
+                        epTime = Math.round(epTimes.reduce((a, b) => a + b, 0) / epTimes.length);
+                    } else if (typeof m.runtime === 'number' && m.runtime > 0) {
+                        epTime = m.runtime;
+                    } else {
+                        epTime = 45; // fallback default per episode
+                    }
+                    // Count total episodes from all seasons, or use number_of_episodes
+                    let numEps = 0;
+                    if (Array.isArray(m.seasons) && m.seasons.length > 0) {
+                        numEps = m.seasons.reduce((sum, s) => sum + (s.episode_count || 0), 0);
+                    }
+                    if (!numEps && typeof m.number_of_episodes === 'number') {
+                        numEps = m.number_of_episodes;
+                    } else if (!numEps && typeof m.episodes === 'number') {
+                        numEps = m.episodes;
+                    } else if (!numEps && typeof m.total_episodes === 'number') {
+                        numEps = m.total_episodes;
+                    }
+                    // If we have episode count but no runtime, use 45m per episode
+                    if (numEps > 0 && (!epTime || epTime <= 0)) {
+                        epTime = 45;
+                    }
+                    // If we have runtime but no episode count, count as 1 episode
+                    if (!numEps && epTime > 0) {
+                        numEps = 1;
+                    }
+                    // If both missing, fallback to 45m * 1
+                    if (!numEps) numEps = 1;
+                    if (!epTime || epTime <= 0) epTime = 45;
+                    totalMinutes += epTime * numEps;
+                } else {
+                    if (typeof m.runtime === 'number') totalMinutes += m.runtime;
+                    else if (typeof m.duration === 'number') totalMinutes += m.duration;
+                    else if (typeof m.length === 'number') totalMinutes += m.length;
+                }
+            });
+            let hours = Math.floor(totalMinutes / 60);
+            let mins = totalMinutes % 60;
+            let timeStr = totalMinutes > 0 ? `${hours}h ${mins}m` : 'N/A';
             return `
-                <div><strong>${movieCount}</strong> Movies Watched</div>
-                <div><strong>${showCount}</strong> Shows Watched</div>
-                <div><strong>${runtimeStr}</strong> Total Runtime</div>
+                <div><strong>${totalMovies}</strong> Movies Watched</div>
+                <div><strong>${totalShows}</strong> Shows Watched</div>
+                <div><strong>${timeStr}</strong> Total Runtime</div>
             `;
         }
 
         function updateProfileStats() {
             const statsDiv = document.getElementById('profileStats');
             if (statsDiv) {
-                statsDiv.innerHTML = getProfileStatsHtml();
+                // Debug: log watched array
+                console.log('Profile watched array:', watched);
+                fetchMissingRuntimesForProfile(watched).then(() => {
+                    statsDiv.innerHTML = getProfileStatsHtml();
+                    console.log('Profile stats updated:', getProfileStatsHtml());
+                });
             }
         }
 
@@ -56,28 +135,57 @@ window.addEventListener('DOMContentLoaded', () => {
     const closeProfilePopup = document.getElementById('closeProfilePopup');
 
     // Simulate sign-in state (replace with real auth logic)
-    let isSignedIn = false;
-    let userProfile = {
-        name: 'User Name',
-        email: 'user@email.com',
-        photoURL: 'https://ui-avatars.com/api/?name=User'
-    };
+
 
     function updateProfileUI() {
-        if (isSignedIn) {
+        // Only use googleUser for sign-in state
+        let user = window.googleUser;
+        if (!user) {
+            try {
+                const saved = localStorage.getItem('googleUser');
+                if (saved) user = JSON.parse(saved);
+            } catch {}
+        }
+        let signedIn = false;
+        let photo = '';
+        let name = '';
+        let email = '';
+        if (user && user.profile) {
+            signedIn = true;
+            photo = user.profile.picture || '';
+            name = user.profile.name || '';
+            email = user.profile.email || '';
+        }
+        if (signedIn) {
             signInBtn.style.display = 'none';
             profilePicBtn.style.display = 'inline-block';
-            profilePicBtn.src = userProfile.photoURL;
+            profilePicBtn.src = photo;
+            // Update profile popup layout
+            const profileAvatar = document.querySelector('#profilePopup .profile-avatar');
+            const profileName = document.querySelector('#profilePopup .profile-name');
+            const profileEmail = document.querySelector('#profilePopup .profile-email');
+            if (profileAvatar) profileAvatar.src = photo;
+            if (profileName) profileName.textContent = name;
+            if (profileEmail) profileEmail.textContent = email;
             updateProfileStats();
         } else {
             signInBtn.style.display = '';
             profilePicBtn.style.display = 'none';
+            // Reset profile popup to default
+            const profileAvatar = document.querySelector('#profilePopup .profile-avatar');
+            const profileName = document.querySelector('#profilePopup .profile-name');
+            const profileEmail = document.querySelector('#profilePopup .profile-email');
+            if (profileAvatar) profileAvatar.src = 'https://ui-avatars.com/api/?name=User';
+            if (profileName) profileName.textContent = 'User Name';
+            if (profileEmail) profileEmail.textContent = 'user@email.com';
         }
     }
 
     // Open profile popup from either button
     function openProfilePopup() {
         if (!profilePopup) return;
+        // Always update profile popup with latest user info before showing
+        if (typeof updateProfileUI === 'function') updateProfileUI();
         // Position below the right side of the button/pic
         let anchor = profilePicBtn && profilePicBtn.style.display !== 'none' ? profilePicBtn : signInBtn;
         if (anchor) {
@@ -113,8 +221,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const signOutBtn = profilePopup.querySelector('.profile-action-btn');
         if (signOutBtn) {
             signOutBtn.addEventListener('click', function() {
-                isSignedIn = false;
-                updateProfileUI();
+                // Remove googleUser and update UI
+                localStorage.removeItem('googleUser');
+                window.googleUser = null;
+                updateSignInUI();
                 profilePopup.classList.remove('open');
             });
         }
@@ -231,17 +341,53 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
     // Tab navigation
+    function loadHomeTab() {
+        currentTab = 'home';
+        currentHome = 'new';
+        // Set Home tab active in main tab bar
+        document.querySelectorAll('.tab-btn').forEach(tb => {
+            tb.classList.toggle('active', tb.getAttribute('data-tab') === 'home');
+        });
+        // Set Home subtab active (New)
+        document.querySelectorAll('.home-dropdown-btn').forEach(tb => {
+            tb.classList.toggle('active', tb.getAttribute('data-home') === 'new');
+        });
+        renderMoviesForTab('home');
+    }
     sideMenuBtns.forEach(btn => {
         btn.addEventListener('click', function(e) {
             document.querySelectorAll('.side-menu-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            // Home tab: toggle sublist
+            // Home tab: load recent movies/shows (like New tab)
             if (btn.getAttribute('data-tab') === 'home') {
                 e.preventDefault();
                 if (sideMenuHomeGroup) sideMenuHomeGroup.classList.toggle('open');
+                // Always close detail page if open
+                const detailPage = document.getElementById('detailPage');
+                const moviesGrid = document.getElementById('moviesGrid');
+                const loadingDiv = document.getElementById('loading');
+                const errorDiv = document.getElementById('error');
+                if (detailPage && detailPage.style.display !== 'none') {
+                    detailPage.style.display = 'none';
+                    if (moviesGrid) moviesGrid.style.display = '';
+                    if (loadingDiv) loadingDiv.style.display = '';
+                    if (errorDiv) errorDiv.style.display = '';
+                }
+                loadHomeTab();
                 return;
             } else {
                 if (sideMenuHomeGroup) sideMenuHomeGroup.classList.remove('open');
+            }
+            // Always close detail page if open
+            const detailPage = document.getElementById('detailPage');
+            const moviesGrid = document.getElementById('moviesGrid');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            if (detailPage && detailPage.style.display !== 'none') {
+                detailPage.style.display = 'none';
+                if (moviesGrid) moviesGrid.style.display = '';
+                if (loadingDiv) loadingDiv.style.display = '';
+                if (errorDiv) errorDiv.style.display = '';
             }
             // Simulate tab click
             const tab = btn.getAttribute('data-tab');
@@ -252,6 +398,14 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             sideMenu.classList.remove('open');
         });
+    });
+    // Main tab bar: Home tab click always loads 'new' view
+    document.querySelectorAll('.tab-btn').forEach(tb => {
+        if (tb.getAttribute('data-tab') === 'home') {
+            tb.addEventListener('click', function(e) {
+                loadHomeTab();
+            });
+        }
     });
     // Home sublist navigation
     sideMenuHomeSubBtns.forEach(btn => {
@@ -393,41 +547,55 @@ function openGoogleSignIn() {
 
 function updateSignInUI() {
     const btn = document.getElementById("signInBtn");
-    if (googleUser && googleUser.profile) {
-        btn.textContent = googleUser.profile.name || "Signed In";
-        btn.disabled = true;
-        btn.style.background = "#fff";
-        btn.style.color = "#222";
-        // Save to localStorage
-        localStorage.setItem('googleUser', JSON.stringify(googleUser));
-        // Load user lists from Firebase
-        loadUserLists();
-    } else {
-        btn.textContent = "Sign In";
-        btn.disabled = false;
-        btn.style.background = "";
-        btn.style.color = "";
-        // Remove from localStorage
-        localStorage.removeItem('googleUser');
-    }
-    // Update side menu profile
-    if (window.renderSideMenuProfile) window.renderSideMenuProfile();
-    // Highlight active subitem on load
-    function highlightActiveHomeSubBtn() {
-        const current = document.querySelector('.home-dropdown-btn.active');
-        if (current) {
-            const val = current.getAttribute('data-home');
-            document.querySelectorAll('.side-menu-home-subbtn').forEach(btn => {
-                if (btn.getAttribute('data-home') === val) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
+        if (googleUser && googleUser.profile) {
+            // Hide the sign in button entirely when signed in
+            btn.style.display = 'none';
+            // Save to localStorage
+            localStorage.setItem('googleUser', JSON.stringify(googleUser));
+            // Load user lists from Firebase
+            loadUserLists();
+            // Show profile picture in title bar
+            const profilePicBtn = document.getElementById('profilePicBtn');
+            if (profilePicBtn) {
+                profilePicBtn.style.display = 'inline-block';
+                profilePicBtn.src = googleUser.profile.picture || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(googleUser.profile.name || 'User');
+            }
+            // Update profile popup layout with user info
+            if (typeof updateProfileUI === 'function') updateProfileUI();
+        } else {
+            btn.textContent = "Sign In";
+            btn.disabled = false;
+            btn.style.background = "";
+            btn.style.color = "";
+            btn.style.display = '';
+            // Hide profile picture in title bar
+            const profilePicBtn = document.getElementById('profilePicBtn');
+            if (profilePicBtn) {
+                profilePicBtn.style.display = 'none';
+            }
+            // Remove from localStorage
+            localStorage.removeItem('googleUser');
+            // Reset profile popup layout
+            if (typeof updateProfileUI === 'function') updateProfileUI();
         }
-    }
-    highlightActiveHomeSubBtn();
-    // Also update highlight on dropdown change
-    document.querySelectorAll('.home-dropdown-btn').forEach(btn => {
-        btn.addEventListener('click', highlightActiveHomeSubBtn);
-    });
+        // Update side menu profile
+        if (window.renderSideMenuProfile) window.renderSideMenuProfile();
+        // Highlight active subitem on load
+        function highlightActiveHomeSubBtn() {
+            const current = document.querySelector('.home-dropdown-btn.active');
+            if (current) {
+                const val = current.getAttribute('data-home');
+                document.querySelectorAll('.side-menu-home-subbtn').forEach(btn => {
+                    if (btn.getAttribute('data-home') === val) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                });
+            }
+        }
+        highlightActiveHomeSubBtn();
+        // Also update highlight on dropdown change
+        document.querySelectorAll('.home-dropdown-btn').forEach(btn => {
+            btn.addEventListener('click', highlightActiveHomeSubBtn);
+        });
 }
 
 // Handle OAuth redirect (popup flow)
@@ -549,6 +717,8 @@ function createMovieCard(movie, tab) {
     const inWatchlist = watchlist.some(m => m.id === movie.id) || watchlist.some(m => (m.title || m.name || '').toLowerCase().trim() === normTitle);
     const inWatched = watched.some(m => m.id === movie.id) || watched.some(m => (m.title || m.name || '').toLowerCase().trim() === normTitle);
     if ((tab === 'home' && currentHome === 'new') || tab === 'home' || tab === undefined) {
+        const actionContainer = document.createElement('div');
+        actionContainer.className = 'card-action-container';
         const btn = document.createElement('button');
         btn.className = 'tab-action-btn';
         if (inWatchlist || inWatched) {
@@ -583,11 +753,15 @@ function createMovieCard(movie, tab) {
                     // Update UI: disable button and update text only for this card
                     btn.textContent = 'In Watchlist';
                     btn.disabled = true;
+                    updateProfileStats();
                 }
             };
         }
-        card.appendChild(btn);
+        actionContainer.appendChild(btn);
+        card.appendChild(actionContainer);
     } else if (tab === 'watchlist') {
+        const actionContainer = document.createElement('div');
+        actionContainer.className = 'card-action-container';
         const btn = document.createElement('button');
         btn.textContent = 'Mark as Watched';
         btn.className = 'tab-action-btn';
@@ -598,9 +772,11 @@ function createMovieCard(movie, tab) {
                 watchlist = watchlist.filter(m => m.id !== movie.id);
                 await saveUserLists();
                 renderMoviesForTab(currentTab);
+                updateProfileStats();
             }
         };
-        card.appendChild(btn);
+        actionContainer.appendChild(btn);
+        card.appendChild(actionContainer);
     }
 
     card.addEventListener('click', () => {
@@ -640,15 +816,27 @@ function showDetailPage(movie) {
     // If this is a season card, use the season's poster and air date for the main detail
     let useSeason = movie._seasonCard && movie._seasonData;
     let bgUrl = '';
-    if (useSeason && movie._seasonData.poster_path) {
+    // For mobile (<=720px), always use poster if available
+    if (window.innerWidth <= 720 && movie.poster_path) {
+        bgUrl = `https://image.tmdb.org/t/p/original${movie.poster_path}`;
+    } else if (useSeason && movie._seasonData.poster_path) {
         bgUrl = `https://image.tmdb.org/t/p/original${movie._seasonData.poster_path}`;
     } else if (movie.backdrop_path && movie.backdrop_path !== 'null') {
         bgUrl = `https://image.tmdb.org/t/p/original${movie.backdrop_path}`;
     }
     // Show loading while fetching details
-    detailPage.innerHTML = `${bgUrl ? `<div class=\"detail-bg\" style=\"background-image:url('${bgUrl}')\"></div>` : ''}
-        <div class=\"detail-content\"><div style=\"padding:48px 0;text-align:center;\">Loading details...</div></div>`;
+    detailPage.innerHTML = `${bgUrl ? `<div class="detail-bg" style="background-image:url('${bgUrl}')"></div>` : ''}
+        <button class="detail-back-btn" style="position:absolute;top:18px;left:18px;z-index:2;background:rgba(18,32,47,0.85);border:none;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.18);cursor:pointer;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00c4ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="detail-content"><div style="padding:48px 0;text-align:center;">Loading details...</div></div>`;
     detailPage.style.display = 'flex';
+    // Add back button event
+    const backBtn = detailPage.querySelector('.detail-back-btn');
+    if (backBtn) {
+        backBtn.onclick = () => {
+            detailPage.style.display = 'none';
+            document.getElementById('moviesGrid').style.display = '';
+        };
+    }
 
     // Fetch extra details from TMDB
     // Robustly determine type for TMDB API (search results may lack media_type)
@@ -920,10 +1108,19 @@ function renderMoviesForTab(tab) {
     const filterType = document.getElementById('filterType');
     const filterVal = filterType ? filterType.value : 'all';
     if (tab === 'home') {
-        if (currentHome === 'now_playing') {
-            movies = nowPlayingMovies.filter(m => !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id));
-        } else if (currentHome === 'new') {
-            movies = allMovies.filter(m => !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id));
+        // Always show like New tab (recent releases only)
+        const now = new Date();
+        const daysAgo = d => {
+            const date = new Date(d);
+            return (now - date) / (1000 * 60 * 60 * 24);
+        };
+        if (currentHome === 'new' || tab === 'home') {
+            movies = allMovies.filter(m => {
+                const dateStr = m.release_date || m.first_air_date;
+                if (!dateStr) return false;
+                const days = daysAgo(dateStr);
+                return days >= 0 && days <= 90 && !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id);
+            });
             // Sort by release date descending (latest first)
             movies = movies.sort((a, b) => {
                 const dateA = new Date(a.release_date || a.first_air_date || '');
@@ -988,137 +1185,14 @@ function renderMoviesForTab(tab) {
         if (q) {
             movies = movies.filter(m => (m.title || m.name || '').toLowerCase().includes(q));
         }
-        let total = movies.length;
-        let totalMovies = movies.filter(m => m.media_type !== 'tv').length;
-        let totalShows = movies.filter(m => m.media_type === 'tv').length;
-
-        // Helper to fetch missing runtime/episode info from TMDB
-        async function fetchMissingRuntimes(items) {
-            let updated = false;
-            for (let m of items) {
-                // Only fetch if missing runtime info
-                if (m.media_type === 'tv') {
-                    let needs = !m.episode_run_time && !m.runtime;
-                    if (needs && m.id && typeof m.id === 'number') {
-                        try {
-                            const resp = await fetch(`${TMDB_BASE_URL}/tv/${m.id}?api_key=${TMDB_API_KEY}&language=en-US`);
-                            if (resp.ok) {
-                                const data = await resp.json();
-                                if (Array.isArray(data.episode_run_time) && data.episode_run_time.length > 0) m.episode_run_time = data.episode_run_time;
-                                if (typeof data.runtime === 'number') m.runtime = data.runtime;
-                                if (typeof data.number_of_episodes === 'number') m.number_of_episodes = data.number_of_episodes;
-                                if (Array.isArray(data.seasons)) m.seasons = data.seasons;
-                                updated = true;
-                            }
-                        } catch {}
-                    }
-                } else {
-                    let needs = typeof m.runtime !== 'number' && typeof m.duration !== 'number' && typeof m.length !== 'number';
-                    if (needs && m.id && typeof m.id === 'number') {
-                        try {
-                            const resp = await fetch(`${TMDB_BASE_URL}/movie/${m.id}?api_key=${TMDB_API_KEY}&language=en-US`);
-                            if (resp.ok) {
-                                const data = await resp.json();
-                                if (typeof data.runtime === 'number') m.runtime = data.runtime;
-                                updated = true;
-                            }
-                        } catch {}
-                    }
-                }
-            }
-            return updated;
+        moviesGrid.innerHTML = '';
+        if (!movies.length) {
+            // Do not display any message for empty watched tab
+            return;
         }
-
-        // Calculate and render summary
-        async function renderWatchedSummary() {
-            let totalMinutes = 0;
-            movies.forEach(m => {
-                if (m.media_type === 'tv') {
-                    // Gather all episode runtimes from top-level and all seasons
-                    let epTimes = [];
-                    if (Array.isArray(m.episode_run_time) && m.episode_run_time.length > 0) {
-                        epTimes = epTimes.concat(m.episode_run_time.filter(x => typeof x === 'number' && x > 0));
-                    } else if (typeof m.episode_run_time === 'number' && m.episode_run_time > 0) {
-                        epTimes.push(m.episode_run_time);
-                    }
-                    if (Array.isArray(m.seasons)) {
-                        m.seasons.forEach(season => {
-                            if (Array.isArray(season.episode_run_time) && season.episode_run_time.length > 0) {
-                                epTimes = epTimes.concat(season.episode_run_time.filter(x => typeof x === 'number' && x > 0));
-                            } else if (typeof season.episode_run_time === 'number' && season.episode_run_time > 0) {
-                                epTimes.push(season.episode_run_time);
-                            }
-                        });
-                    }
-                    // Use average episode runtime if available, else fallback to 45 min per episode
-                    let epTime = 0;
-                    if (epTimes.length > 0) {
-                        epTime = Math.round(epTimes.reduce((a, b) => a + b, 0) / epTimes.length);
-                    } else if (typeof m.runtime === 'number' && m.runtime > 0) {
-                        epTime = m.runtime;
-                    } else {
-                        epTime = 45; // fallback default per episode
-                    }
-                    // Count total episodes from all seasons, or use number_of_episodes
-                    let numEps = 0;
-                    if (Array.isArray(m.seasons) && m.seasons.length > 0) {
-                        numEps = m.seasons.reduce((sum, s) => sum + (s.episode_count || 0), 0);
-                    }
-                    if (!numEps && typeof m.number_of_episodes === 'number') {
-                        numEps = m.number_of_episodes;
-                    } else if (!numEps && typeof m.episodes === 'number') {
-                        numEps = m.episodes;
-                    } else if (!numEps && typeof m.total_episodes === 'number') {
-                        numEps = m.total_episodes;
-                    }
-                    // If we have episode count but no runtime, use 45m per episode
-                    if (numEps > 0 && (!epTime || epTime <= 0)) {
-                        epTime = 45;
-                    }
-                    // If we have runtime but no episode count, count as 1 episode
-                    if (!numEps && epTime > 0) {
-                        numEps = 1;
-                    }
-                    // If both missing, fallback to 45m * 1
-                    if (!numEps) numEps = 1;
-                    if (!epTime || epTime <= 0) epTime = 45;
-                    totalMinutes += epTime * numEps;
-                } else {
-                    if (typeof m.runtime === 'number') totalMinutes += m.runtime;
-                    else if (typeof m.duration === 'number') totalMinutes += m.duration;
-                    else if (typeof m.length === 'number') totalMinutes += m.length;
-                }
-            });
-            let hours = Math.floor(totalMinutes / 60);
-            let mins = totalMinutes % 60;
-            let timeStr = totalMinutes > 0 ? `${hours}h ${mins}m` : 'N/A';
-            moviesGrid.innerHTML = '';
-            const summaryCard = document.createElement('div');
-            summaryCard.className = 'movie-card watched-summary-card';
-            summaryCard.style.background = 'linear-gradient(120deg, #101c2c 60%, #00c4ff 100%)';
-            summaryCard.style.color = '#fff';
-            summaryCard.style.fontWeight = '700';
-            summaryCard.style.fontSize = '1.13rem';
-            summaryCard.style.textAlign = 'center';
-            summaryCard.style.margin = '18px 0 10px 0';
-            summaryCard.style.padding = '32px 12px 28px 12px';
-            summaryCard.style.boxShadow = '0 2px 16px rgba(0,196,255,0.10)';
-            summaryCard.innerHTML = `<div style="font-size:1.25rem;margin-bottom:8px;">Total Watched</div><div style="font-size:2.1rem;color:#fff;letter-spacing:0.01em;">${total}</div><div style="margin-top:10px;font-size:1.08rem;">Movies: <span style='color:#00e6b2;'>${totalMovies}</span> &nbsp;|&nbsp; Shows: <span style='color:#00e6b2;'>${totalShows}</span></div><div style=\"margin-top:12px;font-size:1.05rem;opacity:0.92;\">Total Time: <span style='color:#fff;'>${timeStr}</span></div>`;
-            moviesGrid.appendChild(summaryCard);
-            if (!movies.length) {
-                // Do not display any message for empty watched tab
-                return;
-            }
-            movies.forEach(movie => {
-                moviesGrid.appendChild(createMovieCard(movie, tab));
-            });
-        }
-
-        // Main logic: fetch missing runtimes, then render
-        (async () => {
-            const updated = await fetchMissingRuntimes(movies);
-            await renderWatchedSummary();
-        })();
+        movies.forEach(movie => {
+            moviesGrid.appendChild(createMovieCard(movie, tab));
+        });
     } else if (tab === 'settings') {
         moviesGrid.innerHTML = '<div class="info">Settings will be available soon.</div>';
     } else if (tab === 'about') {
