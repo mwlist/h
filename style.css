@@ -1,83 +1,3 @@
-        /* Ensure detail back button is always visible */
-        .detail-back-btn {
-            z-index: 1002 !important;
-        }
-        @media (max-width: 720px) {
-            .detail-back-btn {
-                top: 2.5vw !important;
-                left: 2.5vw !important;
-                width: 9vw !important;
-                height: 9vw !important;
-                min-width: 36px !important;
-                min-height: 36px !important;
-                max-width: 48px !important;
-                max-height: 48px !important;
-                padding: 0 !important;
-                z-index: 1002 !important;
-                background: rgba(18,32,47,0.92) !important;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.22) !important;
-            }
-            .detail-title {
-                margin-left: 12vw !important;
-                margin-top: 3vw !important;
-                text-align: left !important;
-                font-size: 5vw !important;
-                word-break: break-word;
-                max-width: 80vw !important;
-                line-height: 1.2;
-            }
-            .detail-bg {
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                min-width: 100vw !important;
-                min-height: 100vh !important;
-                border-radius: 0 !important;
-                object-fit: cover !important;
-            }
-            .detail-page {
-                background: transparent !important;
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                margin: 0 !important;
-                padding: 0 0 4vw 0 !important;
-                min-height: 100vh !important;
-                width: 100vw !important;
-                max-width: 100vw !important;
-                flex-direction: column !important;
-                gap: 0 !important;
-                overflow-x: hidden !important;
-            }
-            .detail-content {
-                padding: 4vw 5vw 0 5vw !important;
-                gap: 2vw !important;
-                width: 100vw !important;
-                max-width: 100vw !important;
-                box-sizing: border-box !important;
-            }
-            .detail-meta, .detail-rating-row, .detail-category, .detail-mpa, .detail-date, .detail-genres, .detail-runtime {
-                font-size: 3.5vw !important;
-                margin-bottom: 1vw !important;
-                text-align: left !important;
-            }
-            .detail-overview {
-                font-size: 3.7vw !important;
-                margin-top: 2vw !important;
-                text-align: left !important;
-            }
-            .detail-extra {
-                padding: 2vw 0 !important;
-                font-size: 3.5vw !important;
-                gap: 2vw 0 !important;
-                flex-direction: column !important;
-            }
-            .detail-extra-row {
-                min-width: 0 !important;
-                margin-bottom: 1vw !important;
-            }
-        }
         @media (max-width: 720px) {
             .title-bar .filter-type-select {
                 display: none !important;
@@ -551,14 +471,10 @@
     .side-menu-home-sublist {
         display: none;
         flex-direction: column;
-        margin-left: 10px;
+        margin-left: 12px;
         border-left: 2px solid #00c4ff22;
-        padding-left: 0;
+        padding-left: 8px;
         margin-bottom: 2px;
-        background: linear-gradient(135deg, #1e2d47 80%, #00c4ff22 100%);
-        border-radius: 12px;
-        box-shadow: 0 4px 16px rgba(0,196,255,0.10);
-        overflow: hidden;
     }
     .side-menu-home-group.open .side-menu-home-sublist {
         display: flex;
@@ -568,25 +484,18 @@
         border: none;
         color: #00c4ff;
         font-family: 'Montserrat', Arial, sans-serif;
-        font-size: 1.08rem;
+        font-size: 1.01rem;
         font-weight: 600;
-        padding: 12px 24px 12px 18px;
+        padding: 10px 0 10px 0;
         text-align: left;
         cursor: pointer;
         border-bottom: 1px solid #00c4ff11;
-        transition: background 0.18s, color 0.18s, padding 0.18s;
+        transition: background 0.15s, color 0.15s;
         margin-bottom: 0;
-        border-radius: 0;
-        letter-spacing: 0.01em;
-        position: relative;
-        overflow: hidden;
     }
     .side-menu-home-subbtn.active, .side-menu-home-subbtn:hover {
-        background: linear-gradient(90deg, #00c4ff 0%, #0072ff 100%);
+        background: #00c4ff;
         color: #fff;
-        box-shadow: 0 2px 12px rgba(0,196,255,0.10);
-        padding-left: 28px;
-        border-radius: 8px 32px 32px 8px;
     }
 /* --- Responsive Side Menu --- */
 @media (max-width: 720px) {
@@ -1079,15 +988,14 @@ body {
     position: absolute;
     left: 0;
     top: 110%;
-    min-width: 210px;
-    background: linear-gradient(135deg, #1e2d47 80%, #00c4ff22 100%);
-    border-radius: 18px;
-    box-shadow: 0 12px 40px 0 rgba(0,196,255,0.13), 0 2px 12px 0 rgba(0,0,0,0.13);
-    padding: 10px 0 10px 0;
+    min-width: 180px;
+    background: rgba(18,32,47,0.98);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,196,255,0.10);
+    padding: 8px 0;
     z-index: 100;
     border: 1.5px solid #00c4ff22;
-    animation: fadeInMenu 0.18s cubic-bezier(.4,2,.6,1);
-    overflow: hidden;
+    animation: fadeInMenu 0.18s;
 }
 .home-dropdown-btn {
     display: block;
@@ -1097,28 +1005,20 @@ body {
     outline: none;
     color: #00c4ff;
     font-family: 'Montserrat', Arial, sans-serif;
-    font-size: 1.08rem;
+    font-size: 1rem;
     font-weight: 600;
-    padding: 14px 32px 14px 24px;
+    padding: 12px 28px 12px 22px;
     text-align: left;
     cursor: pointer;
-    transition: background 0.18s, color 0.18s, padding 0.18s;
+    transition: background 0.15s, color 0.15s;
     border-bottom: 1.5px solid rgba(0,196,255,0.08);
-    border-radius: 0;
-    letter-spacing: 0.01em;
-    position: relative;
-    overflow: hidden;
-    background: none;
 }
 .home-dropdown-btn:last-child {
     border-bottom: none;
 }
 .home-dropdown-btn.active, .home-dropdown-btn:hover {
-    background: linear-gradient(90deg, #00c4ff 0%, #0072ff 100%);
+    background: #00c4ff;
     color: #fff;
-    box-shadow: 0 2px 12px rgba(0,196,255,0.10);
-    padding-left: 32px;
-    border-radius: 8px 32px 32px 8px;
 }
 /* Show dropdown on hover over Home tab */
 .tabs.home-dropdown-open #homeDropdown {
