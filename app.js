@@ -341,39 +341,14 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
     // Tab navigation
-    function loadHomeTab() {
-        currentTab = 'home';
-        currentHome = 'new';
-        // Set Home tab active in main tab bar
-        document.querySelectorAll('.tab-btn').forEach(tb => {
-            tb.classList.toggle('active', tb.getAttribute('data-tab') === 'home');
-        });
-        // Set Home subtab active (New)
-        document.querySelectorAll('.home-dropdown-btn').forEach(tb => {
-            tb.classList.toggle('active', tb.getAttribute('data-home') === 'new');
-        });
-        renderMoviesForTab('home');
-    }
     sideMenuBtns.forEach(btn => {
         btn.addEventListener('click', function(e) {
             document.querySelectorAll('.side-menu-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            // Home tab: load recent movies/shows (like New tab)
+            // Home tab: toggle sublist
             if (btn.getAttribute('data-tab') === 'home') {
                 e.preventDefault();
                 if (sideMenuHomeGroup) sideMenuHomeGroup.classList.toggle('open');
-                // Always close detail page if open
-                const detailPage = document.getElementById('detailPage');
-                const moviesGrid = document.getElementById('moviesGrid');
-                const loadingDiv = document.getElementById('loading');
-                const errorDiv = document.getElementById('error');
-                if (detailPage && detailPage.style.display !== 'none') {
-                    detailPage.style.display = 'none';
-                    if (moviesGrid) moviesGrid.style.display = '';
-                    if (loadingDiv) loadingDiv.style.display = '';
-                    if (errorDiv) errorDiv.style.display = '';
-                }
-                loadHomeTab();
                 return;
             } else {
                 if (sideMenuHomeGroup) sideMenuHomeGroup.classList.remove('open');
@@ -398,14 +373,6 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             sideMenu.classList.remove('open');
         });
-    });
-    // Main tab bar: Home tab click always loads 'new' view
-    document.querySelectorAll('.tab-btn').forEach(tb => {
-        if (tb.getAttribute('data-tab') === 'home') {
-            tb.addEventListener('click', function(e) {
-                loadHomeTab();
-            });
-        }
     });
     // Home sublist navigation
     sideMenuHomeSubBtns.forEach(btn => {
@@ -1102,19 +1069,10 @@ function renderMoviesForTab(tab) {
     const filterType = document.getElementById('filterType');
     const filterVal = filterType ? filterType.value : 'all';
     if (tab === 'home') {
-        // Always show like New tab (recent releases only)
-        const now = new Date();
-        const daysAgo = d => {
-            const date = new Date(d);
-            return (now - date) / (1000 * 60 * 60 * 24);
-        };
-        if (currentHome === 'new' || tab === 'home') {
-            movies = allMovies.filter(m => {
-                const dateStr = m.release_date || m.first_air_date;
-                if (!dateStr) return false;
-                const days = daysAgo(dateStr);
-                return days >= 0 && days <= 90 && !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id);
-            });
+        if (currentHome === 'now_playing') {
+            movies = nowPlayingMovies.filter(m => !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id));
+        } else if (currentHome === 'new') {
+            movies = allMovies.filter(m => !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id));
             // Sort by release date descending (latest first)
             movies = movies.sort((a, b) => {
                 const dateA = new Date(a.release_date || a.first_air_date || '');
