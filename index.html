@@ -19,8 +19,8 @@
         <button class="hamburger" id="hamburgerBtn" aria-label="Open menu">
             <span></span><span></span><span></span>
         </button>
-        <span class="logo" id="logoBtn" style="cursor:pointer;"><img src="logo.png" alt="Logo" style="height:48px;width:auto;vertical-align:middle;"></span>
-        <span class="app-title" id="titleBtn" style="cursor:pointer;">My Watchlist</span>
+        <span class="logo"><img src="logo.png" alt="Logo" style="height:48px;width:auto;vertical-align:middle;"></span>
+        <span class="app-title">My Watchlist</span>
         <button class="search-icon-btn" id="searchIconBtn" aria-label="Search" style="display:none;background:none;border:none;outline:none;cursor:pointer;padding:0 8px 0 0;margin-left:auto;">
             <svg class="search-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00c4ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <svg class="close-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00c4ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -117,26 +117,6 @@
         }
         window.addEventListener('resize', moveFilterForMobile);
         window.addEventListener('DOMContentLoaded', moveFilterForMobile);
-        </script>
-        <script>
-        // Make logo and title clickable to load 'new' tab
-        window.addEventListener('DOMContentLoaded', function() {
-            function loadHomeTab() {
-                if (typeof window.currentTab !== 'undefined') window.currentTab = 'home';
-                if (typeof window.currentHome !== 'undefined') window.currentHome = 'new';
-                document.querySelectorAll('.tab-btn').forEach(tb => {
-                    tb.classList.toggle('active', tb.getAttribute('data-tab') === 'home');
-                });
-                document.querySelectorAll('.home-dropdown-btn').forEach(tb => {
-                    tb.classList.toggle('active', tb.getAttribute('data-home') === 'new');
-                });
-                if (typeof window.renderMoviesForTab === 'function') window.renderMoviesForTab('home');
-            }
-            var logoBtn = document.getElementById('logoBtn');
-            var titleBtn = document.getElementById('titleBtn');
-            if (logoBtn) logoBtn.addEventListener('click', loadHomeTab);
-            if (titleBtn) titleBtn.addEventListener('click', loadHomeTab);
-        });
         </script>
         <script src="app.js"></script>
 </body>
