@@ -1069,10 +1069,19 @@ function renderMoviesForTab(tab) {
     const filterType = document.getElementById('filterType');
     const filterVal = filterType ? filterType.value : 'all';
     if (tab === 'home') {
-        if (currentHome === 'now_playing') {
-            movies = nowPlayingMovies.filter(m => !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id));
-        } else if (currentHome === 'new') {
-            movies = allMovies.filter(m => !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id));
+        // Always show like New tab (recent releases only)
+        const now = new Date();
+        const daysAgo = d => {
+            const date = new Date(d);
+            return (now - date) / (1000 * 60 * 60 * 24);
+        };
+        if (currentHome === 'new' || tab === 'home') {
+            movies = allMovies.filter(m => {
+                const dateStr = m.release_date || m.first_air_date;
+                if (!dateStr) return false;
+                const days = daysAgo(dateStr);
+                return days >= 0 && days <= 90 && !watchlist.some(w => w.id === m.id) && !watched.some(w => w.id === m.id);
+            });
             // Sort by release date descending (latest first)
             movies = movies.sort((a, b) => {
                 const dateA = new Date(a.release_date || a.first_air_date || '');
