@@ -1235,18 +1235,6 @@ main {
     backdrop-filter: blur(6px) saturate(1.2);
     -webkit-backdrop-filter: blur(6px) saturate(1.2);
     position: relative;
-    min-height: 420px;
-}
-
-.card-action-container {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    margin-top: auto;
-    padding-bottom: 18px;
-    position: relative;
-    z-index: 2;
 }
 .movie-card:hover {
     transform: translateY(-10px) scale(1.045);
