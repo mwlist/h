@@ -717,8 +717,6 @@ function createMovieCard(movie, tab) {
     const inWatchlist = watchlist.some(m => m.id === movie.id) || watchlist.some(m => (m.title || m.name || '').toLowerCase().trim() === normTitle);
     const inWatched = watched.some(m => m.id === movie.id) || watched.some(m => (m.title || m.name || '').toLowerCase().trim() === normTitle);
     if ((tab === 'home' && currentHome === 'new') || tab === 'home' || tab === undefined) {
-        const actionContainer = document.createElement('div');
-        actionContainer.className = 'card-action-container';
         const btn = document.createElement('button');
         btn.className = 'tab-action-btn';
         if (inWatchlist || inWatched) {
@@ -757,11 +755,8 @@ function createMovieCard(movie, tab) {
                 }
             };
         }
-        actionContainer.appendChild(btn);
-        card.appendChild(actionContainer);
+        card.appendChild(btn);
     } else if (tab === 'watchlist') {
-        const actionContainer = document.createElement('div');
-        actionContainer.className = 'card-action-container';
         const btn = document.createElement('button');
         btn.textContent = 'Mark as Watched';
         btn.className = 'tab-action-btn';
@@ -775,8 +770,7 @@ function createMovieCard(movie, tab) {
                 updateProfileStats();
             }
         };
-        actionContainer.appendChild(btn);
-        card.appendChild(actionContainer);
+        card.appendChild(btn);
     }
 
     card.addEventListener('click', () => {
